@@ -1,1 +1,102 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import OneHotEncoder
+
+plt.style.use('seaborn')
+
+dataset = pd.read_csv("UberDataset.csv")
+print(dataset.head())
+print(dataset.shape)
+print(dataset.info())
+
+dataset['PURPOSE'].fillna("NOT", inplace=True)
+dataset['START_DATE'] = pd.to_datetime(dataset['START_DATE'], errors='coerce')
+dataset['END_DATE'] = pd.to_datetime(dataset['END_DATE'], errors='coerce')
+
+dataset['date'] = pd.DatetimeIndex(dataset['START_DATE']).date
+dataset['time'] = pd.DatetimeIndex(dataset['START_DATE']).hour
+
+dataset['day-night'] = pd.cut(
+    dataset['time'],
+    bins=[0, 10, 15, 19, 24],
+    labels=['Morning', 'Afternoon', 'Evening', 'Night'],
+    include_lowest=True
+)
+
+dataset.dropna(inplace=True)
+dataset.drop_duplicates(inplace=True)
+
+print(dataset.shape)
+
+obj = (dataset.dtypes == 'object')
+object_cols = list(obj[obj].index)
+
+unique_values = {col: dataset[col].nunique() for col in object_cols}
+print(unique_values)
+
+plt.figure(figsize=(12,6))
+plt.subplot(1,2,1)
+sns.countplot(x='CATEGORY', data=dataset)
+plt.xticks(rotation=90)
+plt.subplot(1,2,2)
+sns.countplot(x='PURPOSE', data=dataset)
+plt.xticks(rotation=90)
+plt.tight_layout()
+plt.show()
+
+sns.countplot(x='day-night', data=dataset)
+plt.show()
+
+plt.figure(figsize=(12,5))
+sns.countplot(data=dataset, x='PURPOSE', hue='CATEGORY')
+plt.xticks(rotation=90)
+plt.show()
+
+object_cols = ['CATEGORY', 'PURPOSE']
+encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+OH_cols = pd.DataFrame(encoder.fit_transform(dataset[object_cols]))
+OH_cols.columns = encoder.get_feature_names_out(object_cols)
+OH_cols.index = dataset.index
+
+dataset_encoded = pd.concat([dataset.drop(object_cols, axis=1), OH_cols], axis=1)
+print(dataset_encoded.shape)
+
+num_data = dataset_encoded.select_dtypes(include=['number'])
+plt.figure(figsize=(14,10))
+sns.heatmap(num_data.corr(), annot=True, cmap='BrBG', linewidths=1)
+plt.show()
+
+dataset['MONTH'] = dataset['START_DATE'].dt.month
+month_map = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'}
+dataset['MONTH'] = dataset['MONTH'].map(month_map)
+
+monthly_count = dataset['MONTH'].value_counts().sort_index()
+
+plt.figure(figsize=(10,5))
+sns.lineplot(x=monthly_count.index, y=monthly_count.values, marker="o")
+plt.xlabel("Month")
+plt.ylabel("Ride Count")
+plt.grid(True)
+plt.show()
+
+dataset['DAY'] = dataset['START_DATE'].dt.weekday
+day_map = {0:'Mon', 1:'Tue', 2:'Wed', 3:'Thu', 4:'Fri', 5:'Sat', 6:'Sun'}
+dataset['DAY'] = dataset['DAY'].map(day_map)
+
+sns.barplot(x=dataset['DAY'].value_counts().index,
+            y=dataset['DAY'].value_counts().values)
+plt.xlabel("Day")
+plt.ylabel("Count")
+plt.show()
+
+sns.boxplot(x=dataset['MILES'])
+plt.show()
+
+sns.boxplot(x=dataset[dataset['MILES'] < 100]['MILES'])
+plt.show()
+
+sns.histplot(dataset[dataset['MILES'] < 40]['MILES'], kde=True)
+plt.show()
 
